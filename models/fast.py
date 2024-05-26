@@ -7,6 +7,7 @@ from .backbone import build_backbone
 from .neck import build_neck
 from .head import build_head
 
+import pdb
 
 class FAST(nn.Module):
     def __init__(self, backbone, neck, detection_head):
@@ -28,6 +29,7 @@ class FAST(nn.Module):
             torch.cuda.synchronize()
             start = time.time()
 
+        # pdb.set_trace()
         # backbone
         f = self.backbone(imgs)
 

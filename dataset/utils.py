@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageOps
 import scipy.io as scio
 import Polygon as plg
 import numpy as np
@@ -10,17 +10,44 @@ import math
 import cv2
 
 
-def get_img(img_path, read_type='pil'):
+# 이미지 사이즈 초과로 수정
+def get_img(img_path, read_type='pil', max_size=None):
+    Image.MAX_IMAGE_PIXELS = None
     try:
         if read_type == 'cv2':
             img = cv2.imread(img_path)
             img = img[:, :, [2, 1, 0]]
         elif read_type == 'pil':
-            img = np.array(Image.open(img_path))
+            img_pil = Image.open(img_path)
+
+            # Resize the image if it exceeds the maximum size
+            if max_size is not None and img_pil.size[0] * img_pil.size[1] > max_size:
+                aspect_ratio = img_pil.size[0] / img_pil.size[1]
+                new_width = int(np.sqrt(max_size * aspect_ratio))
+                new_height = int(np.sqrt(max_size / aspect_ratio))
+                img_pil = img_pil.resize((new_width, new_height), Image.ANTIALIAS)
+
+            img_pil = ImageOps.exif_transpose(img_pil)
+            img = np.array(img_pil)
     except Exception as e:
         print(img_path)
         raise
     return img
+
+
+# def get_img(img_path, read_type='pil'):
+#     try:
+#         if read_type == 'cv2':
+#             img = cv2.imread(img_path)
+#             img = img[:, :, [2, 1, 0]]
+#         elif read_type == 'pil':
+#             img_pil = Image.open(img_path)
+#             img_pil = ImageOps.exif_transpose(img_pil)
+#             img = np.array(img_pil)
+#     except Exception as e:
+#         print(img_path)
+#         raise
+#     return img
 
 
 def get_ctw_ann_old(img, gt_path):
@@ -83,6 +110,25 @@ def get_ic15_ann(img, gt_path):
         bboxes.append(bbox)
     return np.array(bboxes), words
 
+def get_sample_ann(img, gt_path):
+    h, w = img.shape[0:2]
+    lines = mmcv.list_from_file(gt_path)
+    bboxes = []
+    words = []
+    for line in lines:
+        line = line.encode('utf-8').decode('utf-8-sig')
+        line = line.replace('\xef\xbb\xbf', '')
+        gt = line.split(',')
+        word = gt[8].replace('\r', '').replace('\n', '')
+        if word[0] == '#':
+            words.append('###')
+        else:
+            words.append(word)
+
+        bbox = [float(gt[i]) for i in range(8)]
+        bbox = np.array(bbox) / ([w * 1.0, h * 1.0] * 4)
+        bboxes.append(bbox)
+    return np.array(bboxes), words
 
 def get_msra_ann(img, gt_path):
     h, w = img.shape[0:2]
